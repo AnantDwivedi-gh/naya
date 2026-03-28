@@ -79,12 +79,16 @@ export async function POST(request: NextRequest) {
     }
 
     // --- Sanitise inputs (prompt-injection aware) ----------------------------
-    const descriptionResult = sanitizePrompt(body.description as string, 5000);
-    const desiredBehaviorResult = sanitizePrompt(body.desiredBehavior as string, 5000);
+    const cleanDescription = sanitizeInput(body.description as string, 5000);
+    const cleanBehavior = sanitizeInput(body.desiredBehavior as string, 5000);
     const targetApp = sanitizeInput(body.targetApp as string, 200);
 
-    // Log if prompt injection was detected (do not block — just flag)
-    if (descriptionResult.injectionDetected || desiredBehaviorResult.injectionDetected) {
+    // Check for prompt injection (flag only, don't block)
+    const descriptionResult = sanitizePrompt(body.description as string, 5000);
+    const desiredBehaviorResult = sanitizePrompt(body.desiredBehavior as string, 5000);
+    const injectionDetected = descriptionResult.injectionDetected || desiredBehaviorResult.injectionDetected;
+
+    if (injectionDetected) {
       console.warn(
         "Potential prompt injection detected in /api/features/generate",
         {
@@ -95,10 +99,11 @@ export async function POST(request: NextRequest) {
     }
 
     // --- Build request ------------------------------------------------------
+    // Use clean text for feature metadata, wrapped text only for AI prompt
     const genRequest: GenerateFeatureRequest = {
-      description: descriptionResult.text,
+      description: cleanDescription,
       targetApp,
-      desiredBehavior: desiredBehaviorResult.text,
+      desiredBehavior: cleanBehavior,
       category: (body.category as FeatureCategory) || undefined,
     };
 
@@ -128,8 +133,7 @@ export async function POST(request: NextRequest) {
       data: generated,
       meta: {
         generationMethod,
-        promptInjectionDetected:
-          descriptionResult.injectionDetected || desiredBehaviorResult.injectionDetected,
+        promptInjectionDetected: injectionDetected,
         timestamp: new Date().toISOString(),
       },
     });
