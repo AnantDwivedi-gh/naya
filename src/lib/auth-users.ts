@@ -1,7 +1,9 @@
 import { hashSync, compareSync } from "bcryptjs";
 
 // ---------------------------------------------------------------------------
-// In-memory user store (production: swap for Convex/DB)
+// User store — uses global Map that persists across requests in same
+// serverless instance + JWT carries user data so auth works even after
+// cold starts.
 // ---------------------------------------------------------------------------
 
 export interface StoredUser {
@@ -14,11 +16,15 @@ export interface StoredUser {
   createdAt: string;
 }
 
-const users = new Map<string, StoredUser>();
+// Use global to persist across hot reloads in dev and within same
+// serverless invocation on Vercel
+const globalUsers = (globalThis as any).__nayaUsers as Map<string, StoredUser> | undefined;
+const users: Map<string, StoredUser> = globalUsers ?? new Map<string, StoredUser>();
+(globalThis as any).__nayaUsers = users;
 
-// Seed demo accounts
-const SEED_USERS: StoredUser[] = [
-  {
+// Seed demo account (always available)
+if (!users.has("demo@naya.app")) {
+  users.set("demo@naya.app", {
     id: "demo-001",
     username: "demo",
     name: "Demo User",
@@ -26,20 +32,7 @@ const SEED_USERS: StoredUser[] = [
     image: null,
     passwordHash: hashSync("Naya@2024!", 10),
     createdAt: new Date().toISOString(),
-  },
-  {
-    id: "creator-001",
-    username: "creator",
-    name: "Naya Creator",
-    email: "creator@naya.app",
-    image: null,
-    passwordHash: hashSync("Naya@2024!", 10),
-    createdAt: new Date().toISOString(),
-  },
-];
-
-for (const u of SEED_USERS) {
-  users.set(u.email.toLowerCase(), u);
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -48,7 +41,7 @@ for (const u of SEED_USERS) {
 
 export interface PasswordCheck {
   valid: boolean;
-  score: number; // 0-5
+  score: number;
   checks: {
     minLength: boolean;
     hasUppercase: boolean;
@@ -92,8 +85,7 @@ export function validateUsername(username: string): { valid: boolean; message: s
   if (/^[._]/.test(username) || /[._]$/.test(username)) return { valid: false, message: "Cannot start or end with . or _" };
   if (/[._]{2}/.test(username)) return { valid: false, message: "No consecutive dots or underscores" };
 
-  // Check reserved
-  const reserved = ["admin", "naya", "system", "root", "api", "auth", "demo", "test"];
+  const reserved = ["admin", "naya", "system", "root", "api", "auth"];
   if (reserved.includes(username)) return { valid: false, message: "Username is reserved" };
 
   return { valid: true, message: "Available" };
@@ -113,7 +105,7 @@ export function validateEmail(email: string): { valid: boolean; message: string 
 // CRUD
 // ---------------------------------------------------------------------------
 
-let userCounter = 2;
+let userCounter = (globalThis as any).__nayaUserCounter ?? 100;
 
 export function findUserByEmail(email: string): StoredUser | null {
   return users.get(email.toLowerCase()) ?? null;
@@ -153,6 +145,8 @@ export function createUser(data: {
   if (!emCheck.valid) throw new Error(emCheck.message);
 
   userCounter++;
+  (globalThis as any).__nayaUserCounter = userCounter;
+
   const user: StoredUser = {
     id: `user-${String(userCounter).padStart(3, "0")}`,
     username: data.username.toLowerCase(),
@@ -174,21 +168,21 @@ export function findOrCreateGitHubUser(profile: {
   email: string | null;
   avatar_url: string;
 }): StoredUser {
-  // Check if user exists by email
   if (profile.email) {
     const existing = findUserByEmail(profile.email);
     if (existing) return existing;
   }
 
-  // Create new user from GitHub
   userCounter++;
+  (globalThis as any).__nayaUserCounter = userCounter;
+
   const user: StoredUser = {
     id: `gh-${profile.id}`,
     username: profile.login.toLowerCase(),
     name: profile.name ?? profile.login,
     email: (profile.email ?? `${profile.login}@github.naya.app`).toLowerCase(),
     image: profile.avatar_url,
-    passwordHash: "", // GitHub users don't have a password
+    passwordHash: "",
     createdAt: new Date().toISOString(),
   };
 

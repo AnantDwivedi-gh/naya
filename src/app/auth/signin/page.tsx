@@ -213,13 +213,10 @@ function SignInPageInner() {
               </button>
             </form>
 
-            {/* Demo hint */}
-            <div className="border border-white/5 bg-white/[0.02] px-3 py-2.5 space-y-1">
-              <span className="text-[10px] font-mono tracking-[0.15em] text-white/25 block">
-                // DEMO ACCOUNT
-              </span>
-              <span className="text-[10px] font-mono text-white/35 block">
-                demo@naya.app / Naya@2024!
+            {/* Security note */}
+            <div className="border border-white/5 bg-white/[0.02] px-3 py-2.5">
+              <span className="text-[9px] font-mono text-white/25 block">
+                // SESSIONS ARE ENCRYPTED · 30-DAY PERSISTENCE
               </span>
             </div>
 
