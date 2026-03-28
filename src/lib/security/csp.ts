@@ -28,7 +28,9 @@ export const cspDirectives: CspDirectives = {
   "default-src": ["'self'"],
   "script-src": [
     "'self'",
-    "https://va.vercel-scripts.com", // Vercel Analytics
+    "'unsafe-inline'",                // Required for Next.js hydration scripts
+    "'unsafe-eval'",                  // Required for Next.js dev mode + some runtime
+    "https://va.vercel-scripts.com",  // Vercel Analytics
   ],
   "style-src": [
     "'self'",
