@@ -1,0 +1,285 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* --- JetBrains Mono from Google Fonts --- */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap');
+
+/* --- Base Reset --- */
+@layer base {
+  *,
+  *::before,
+  *::after {
+    border-color: #333333;
+  }
+
+  html {
+    color-scheme: dark;
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    background-color: #000000;
+    color: #ffffff;
+  }
+
+  body {
+    min-height: 100vh;
+    background-color: #000000;
+    color: #ffffff;
+    font-size: 14px;
+    line-height: 1.6;
+    letter-spacing: -0.01em;
+  }
+
+  /* Remove all border-radius globally */
+  *,
+  *::before,
+  *::after {
+    border-radius: 0 !important;
+  }
+
+  ::selection {
+    background-color: #ff0000;
+    color: #000000;
+  }
+
+  ::placeholder {
+    color: #666666;
+    opacity: 1;
+  }
+}
+
+/* --- Custom Scrollbar --- */
+@layer base {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #333333 #000000;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #000000;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #333333;
+    border: none;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #666666;
+  }
+
+  ::-webkit-scrollbar-corner {
+    background: #000000;
+  }
+}
+
+/* --- Focus States --- */
+@layer base {
+  :focus-visible {
+    outline: 1px solid #ff0000;
+    outline-offset: 2px;
+  }
+
+  a:focus-visible,
+  button:focus-visible {
+    outline: 1px solid #ff0000;
+    outline-offset: 2px;
+  }
+}
+
+/* --- Dot Matrix Background --- */
+@layer utilities {
+  .bg-dot-matrix {
+    background-image: radial-gradient(circle, #222222 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  .bg-dot-matrix-dense {
+    background-image: radial-gradient(circle, #222222 1px, transparent 1px);
+    background-size: 16px 16px;
+  }
+
+  .bg-grid {
+    background-image:
+      linear-gradient(#111111 1px, transparent 1px),
+      linear-gradient(90deg, #111111 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  .bg-scan-lines {
+    background-image: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(255, 255, 255, 0.02) 2px,
+      rgba(255, 255, 255, 0.02) 4px
+    );
+  }
+}
+
+/* --- Nothing-Inspired Components --- */
+@layer components {
+  /* Stark input fields */
+  .input-stark {
+    @apply w-full bg-black border border-gray-700 px-4 py-3 text-white font-mono text-sm;
+    @apply placeholder:text-gray-500 focus:border-red focus:outline-none;
+    @apply transition-colors duration-150;
+  }
+
+  .input-stark:hover {
+    @apply border-gray-500;
+  }
+
+  /* Industrial buttons */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3;
+    @apply bg-white text-black font-mono text-sm font-bold uppercase tracking-wider;
+    @apply border border-white;
+    @apply hover:bg-red hover:border-red hover:text-black;
+    @apply active:opacity-80;
+    @apply transition-all duration-150;
+    @apply disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:border-white;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3;
+    @apply bg-black text-white font-mono text-sm font-bold uppercase tracking-wider;
+    @apply border border-gray-700;
+    @apply hover:border-white;
+    @apply active:opacity-80;
+    @apply transition-all duration-150;
+    @apply disabled:opacity-30 disabled:cursor-not-allowed;
+  }
+
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3;
+    @apply bg-black text-red font-mono text-sm font-bold uppercase tracking-wider;
+    @apply border border-red;
+    @apply hover:bg-red hover:text-black;
+    @apply active:opacity-80;
+    @apply transition-all duration-150;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2;
+    @apply bg-transparent text-gray-400 font-mono text-sm;
+    @apply border border-transparent;
+    @apply hover:text-white hover:border-gray-700;
+    @apply transition-all duration-150;
+  }
+
+  /* Card with industrial edges */
+  .card {
+    @apply bg-gray-900 border border-gray-700 p-6;
+  }
+
+  .card-hover {
+    @apply card;
+    @apply hover:border-gray-500 transition-colors duration-150;
+  }
+
+  .card-active {
+    @apply card;
+    @apply border-red;
+  }
+
+  /* Monospace labels */
+  .label {
+    @apply text-2xs font-mono uppercase tracking-[0.2em] text-gray-500;
+  }
+
+  /* Separator */
+  .divider {
+    @apply w-full h-px bg-gray-700;
+  }
+
+  /* Status indicator dot */
+  .status-dot {
+    @apply inline-block w-2 h-2 bg-gray-500;
+  }
+
+  .status-dot-active {
+    @apply status-dot bg-red;
+  }
+
+  .status-dot-ready {
+    @apply status-dot bg-white;
+  }
+
+  /* Glyph/code display */
+  .code-block {
+    @apply bg-gray-900 border border-gray-700 p-4 font-mono text-sm text-gray-400;
+    @apply overflow-x-auto;
+  }
+
+  /* Nothing-style pill/tag */
+  .tag {
+    @apply inline-flex items-center px-3 py-1 font-mono text-2xs uppercase tracking-wider;
+    @apply border border-gray-700 text-gray-400;
+  }
+
+  .tag-red {
+    @apply tag border-red text-red;
+  }
+
+  /* Overlay container styling */
+  .overlay-container {
+    @apply fixed z-50;
+    @apply bg-black border border-gray-700;
+    @apply shadow-[0_0_0_1px_#333333,0_8px_32px_rgba(0,0,0,0.8)];
+  }
+
+  /* Animated border trace effect */
+  .border-trace {
+    background: linear-gradient(90deg, transparent, #ff0000, transparent);
+    background-size: 200% 100%;
+    animation: border-trace 2s linear infinite;
+  }
+}
+
+/* --- Typography --- */
+@layer components {
+  .text-display {
+    @apply text-4xl font-bold tracking-tight leading-none;
+  }
+
+  .text-heading {
+    @apply text-2xl font-bold tracking-tight;
+  }
+
+  .text-subheading {
+    @apply text-lg font-medium tracking-tight;
+  }
+
+  .text-body {
+    @apply text-sm leading-relaxed;
+  }
+
+  .text-caption {
+    @apply text-xs text-gray-500;
+  }
+
+  .text-mono-sm {
+    @apply font-mono text-xs tracking-tight;
+  }
+}
+
+/* --- Animations --- */
+@layer utilities {
+  .stagger-1 { animation-delay: 50ms; }
+  .stagger-2 { animation-delay: 100ms; }
+  .stagger-3 { animation-delay: 150ms; }
+  .stagger-4 { animation-delay: 200ms; }
+  .stagger-5 { animation-delay: 250ms; }
+
+  .animate-in {
+    animation: slide-up 300ms ease-out both;
+  }
+}
