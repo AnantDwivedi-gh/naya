@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSession } from "next-auth/react";
+import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
@@ -32,7 +32,7 @@ interface DeployedFeature {
 }
 
 export default function ProfilePage() {
-  const { data: session, status } = useSession();
+  const { user: clerkUser, isLoaded, isSignedIn } = useUser();
   const router = useRouter();
   const [tab, setTab] = useState<"features" | "deployed" | "communities">("features");
   const [mounted, setMounted] = useState(false);
@@ -44,19 +44,15 @@ export default function ProfilePage() {
 
   // Redirect if not logged in
   useEffect(() => {
-    if (mounted && status === "unauthenticated") {
-      router.push("/auth/signin");
+    if (mounted && isLoaded && !isSignedIn) {
+      router.push("/auth/sign-in");
     }
-  }, [mounted, status, router]);
+  }, [mounted, isLoaded, isSignedIn, router]);
 
   // Fetch user's created features
   useEffect(() => {
-    if (!mounted || !session?.user) return;
-    const userId = (session.user as { id?: string }).id;
-    if (!userId) {
-      setFeaturesLoading(false);
-      return;
-    }
+    if (!mounted || !clerkUser) return;
+    const userId = clerkUser.id;
 
     fetch(`/api/features?authorId=${encodeURIComponent(userId)}&pageSize=50`)
       .then((res) => res.json())
@@ -69,7 +65,7 @@ export default function ProfilePage() {
         console.error("Failed to fetch user features:", err);
       })
       .finally(() => setFeaturesLoading(false));
-  }, [mounted, session]);
+  }, [mounted, clerkUser]);
 
   // Load deployments from localStorage
   useEffect(() => {
@@ -85,7 +81,7 @@ export default function ProfilePage() {
   if (!mounted) return null;
 
   // Show loading while session is resolving
-  if (status === "loading") {
+  if (!isLoaded) {
     return (
       <div className="min-h-screen bg-black text-white">
         <NavHeader activePage="profile" />
@@ -97,19 +93,18 @@ export default function ProfilePage() {
     );
   }
 
-  // If unauthenticated, we already redirected above; render nothing while redirecting
-  if (!session?.user) return null;
+  if (!clerkUser) return null;
 
-  const user = session.user as {
-    id?: string;
-    name?: string | null;
-    email?: string | null;
-    image?: string | null;
-    username?: string;
+  const user = {
+    id: clerkUser.id,
+    name: clerkUser.fullName,
+    email: clerkUser.primaryEmailAddress?.emailAddress ?? null,
+    image: clerkUser.imageUrl,
+    username: clerkUser.username ?? clerkUser.firstName?.toLowerCase() ?? "user",
   };
 
   const displayName = user.username ?? user.name ?? user.email?.split("@")[0] ?? "user";
-  const joinDate = "Member"; // Session doesn't carry join date; static fallback
+  const joinDate = clerkUser.createdAt ? new Date(clerkUser.createdAt).toLocaleDateString("en-US", { month: "long", year: "numeric" }) : "Member";
 
   const achievements = [
     { name: "FIRST DEPLOY", desc: "Deployed your first feature", earned: deployments.length > 0 },
