@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api-client";
 import type { Feature, FeatureCategory } from "@/lib/data/types";
+import { NavHeader } from "@/components/layout/nav-header";
 
 const CATEGORIES: { key: FeatureCategory | "ALL"; label: string }[] = [
   { key: "ALL", label: "ALL" },
@@ -206,26 +207,7 @@ export default function ExplorePage() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      {/* Header */}
-      <header className="border-b border-white/5">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <a href="/" className="font-mono text-lg font-bold tracking-[0.3em]">
-              NAYA<span className="text-red-500">.</span>
-            </a>
-            <span className="text-white/20 font-mono text-sm">/</span>
-            <span className="text-[11px] font-mono tracking-[0.15em] text-white/40">
-              EXPLORE
-            </span>
-          </div>
-          <a
-            href="/create"
-            className="text-[11px] font-mono tracking-[0.15em] bg-red-500 text-black px-4 py-2 hover:bg-red-400 transition-colors flex items-center gap-1.5"
-          >
-            <Zap size={11} /> CREATE FEATURE
-          </a>
-        </div>
-      </header>
+      <NavHeader activePage="explore" breadcrumbs={[{ label: "EXPLORE" }]} />
 
       <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Search Bar */}

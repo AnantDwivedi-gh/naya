@@ -23,8 +23,40 @@ export async function GET(request: NextRequest) {
     const category = searchParams.get("category");
     const targetApp = searchParams.get("targetApp");
     const search = searchParams.get("search");
+    const authorId = searchParams.get("authorId");
     const page = parseInt(searchParams.get("page") || "1", 10);
     const pageSize = Math.min(parseInt(searchParams.get("pageSize") || "20", 10), 100);
+
+    // If authorId is provided, return features by that author
+    if (authorId) {
+      if (USE_CONVEX) {
+        const { convex, api } = await getConvex();
+        // Try querying with authorId filter via standard list
+        const result = await convex.query(api.features.list, {
+          filter: filter || undefined,
+          category: category || undefined,
+          targetApp: targetApp ? sanitizeInput(targetApp, 200) : undefined,
+          search: search ? sanitizeInput(search, 200) : undefined,
+          page: Number.isFinite(page) && page > 0 ? page : 1,
+          pageSize: Number.isFinite(pageSize) && pageSize > 0 ? pageSize : 20,
+        });
+        // Filter by authorId client-side since Convex list may not support it
+        const filtered = result.data.filter((f: { authorId: string }) => f.authorId === authorId);
+        return NextResponse.json({
+          ...result,
+          data: filtered,
+          meta: { ...result.meta, total: filtered.length },
+        });
+      } else {
+        const { getFeaturesByAuthor } = await import("@/lib/data/features");
+        const features = await getFeaturesByAuthor(sanitizeInput(authorId, 200));
+        return NextResponse.json({
+          success: true,
+          data: features,
+          meta: { total: features.length, page: 1, pageSize: features.length, totalPages: 1 },
+        });
+      }
+    }
 
     if (USE_CONVEX) {
       const { convex, api } = await getConvex();

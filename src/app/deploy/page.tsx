@@ -21,6 +21,7 @@ import {
   BarChart3,
   AlertCircle,
 } from "lucide-react";
+import { NavHeader } from "@/components/layout/nav-header";
 
 interface DeployedFeature {
   id: string;
@@ -190,24 +191,7 @@ export default function DeployPage() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      {/* Header */}
-      <header className="border-b border-white/5">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <a href="/" className="font-mono text-lg font-bold tracking-[0.3em]">
-              NAYA<span className="text-red-500">.</span>
-            </a>
-            <span className="text-white/20 font-mono text-sm">/</span>
-            <span className="text-[11px] font-mono tracking-[0.15em] text-white/40">DEPLOY</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-[10px] font-mono text-green-500 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 bg-green-500 animate-pulse inline-block" />
-              {running} RUNNING
-            </span>
-          </div>
-        </div>
-      </header>
+      <NavHeader activePage="deploy" breadcrumbs={[{ label: "DEPLOY" }]} />
 
       <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
         {/* Device Capability Panel */}

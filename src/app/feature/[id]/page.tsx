@@ -28,18 +28,12 @@ import {
 } from "lucide-react";
 import { api, ApiClientError } from "@/lib/api-client";
 import type { Feature } from "@/lib/data/types";
+import { NavHeader } from "@/components/layout/nav-header";
 
 function FeatureDetailSkeleton() {
   return (
     <div className="min-h-screen bg-black text-white">
-      <header className="border-b border-white/5">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center gap-4">
-            <div className="h-4 w-12 bg-white/5 animate-pulse" />
-            <div className="h-3 w-24 bg-white/[0.03] animate-pulse" />
-          </div>
-        </div>
-      </header>
+      <NavHeader activePage="feature" breadcrumbs={[{ label: "EXPLORE", href: "/explore" }, { label: "..." }]} />
       <div className="max-w-7xl mx-auto px-6 py-8">
         <div className="space-y-6">
           <div className="h-3 w-32 bg-white/5 animate-pulse" />
@@ -163,28 +157,24 @@ export default function FeatureDetailPage() {
     );
   }
 
-  const codeDisplay = `// === HTML ===\n${feature.code.html}\n\n// === CSS ===\n${feature.code.css}\n\n// === JavaScript ===\n${feature.code.js}`;
+  // Safely extract code — handle both object and string forms
+  const featureCode =
+    typeof feature.code === "object" && feature.code !== null
+      ? feature.code
+      : { html: "", css: "", js: "" };
+  const codeHtml = featureCode.html || "";
+  const codeCss = featureCode.css || "";
+  const codeJs = featureCode.js || "";
 
   return (
     <div className="min-h-screen bg-black text-white">
-      {/* Header */}
-      <header className="border-b border-white/5">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <a href="/" className="font-mono text-lg font-bold tracking-[0.3em]">
-              NAYA<span className="text-red-500">.</span>
-            </a>
-            <span className="text-white/20 font-mono text-sm">/</span>
-            <a href="/explore" className="text-[11px] font-mono tracking-[0.15em] text-white/40 hover:text-white/60">
-              EXPLORE
-            </a>
-            <span className="text-white/20 font-mono text-sm">/</span>
-            <span className="text-[11px] font-mono tracking-[0.15em] text-white/60">
-              {feature.name.toUpperCase()}
-            </span>
-          </div>
-        </div>
-      </header>
+      <NavHeader
+        activePage="feature"
+        breadcrumbs={[
+          { label: "EXPLORE", href: "/explore" },
+          { label: feature.name.toUpperCase() },
+        ]}
+      />
 
       <div className="max-w-7xl mx-auto px-6 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -360,26 +350,89 @@ export default function FeatureDetailPage() {
             )}
 
             {activeTab === "code" && (
-              <div className="border border-white/10 bg-black">
-                <div className="px-4 py-2 border-b border-white/5 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Code size={12} className="text-red-500" />
-                    <span className="text-[10px] font-mono tracking-[0.15em] text-white/40">
-                      FEATURE_WIDGET.TSX
-                    </span>
+              <div className="space-y-4">
+                {/* HTML */}
+                {codeHtml && (
+                  <div className="border border-white/10 bg-black">
+                    <div className="px-4 py-2 border-b border-white/5 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Code size={12} className="text-red-500" />
+                        <span className="text-[10px] font-mono tracking-[0.15em] text-white/40">
+                          HTML
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => navigator.clipboard.writeText(codeHtml)}
+                        className="text-[10px] font-mono text-white/30 hover:text-white transition-colors"
+                      >
+                        COPY
+                      </button>
+                    </div>
+                    <pre className="p-4 overflow-x-auto max-h-[300px] overflow-y-auto">
+                      <code className="text-xs font-mono text-white/50 leading-relaxed whitespace-pre-wrap">
+                        {codeHtml}
+                      </code>
+                    </pre>
                   </div>
-                  <button
-                    onClick={() => navigator.clipboard.writeText(codeDisplay)}
-                    className="text-[10px] font-mono text-white/30 hover:text-white transition-colors"
-                  >
-                    COPY
-                  </button>
-                </div>
-                <pre className="p-4 overflow-x-auto max-h-[500px] overflow-y-auto">
-                  <code className="text-xs font-mono text-white/50 leading-relaxed whitespace-pre-wrap">
-                    {codeDisplay}
-                  </code>
-                </pre>
+                )}
+
+                {/* CSS */}
+                {codeCss && (
+                  <div className="border border-white/10 bg-black">
+                    <div className="px-4 py-2 border-b border-white/5 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Code size={12} className="text-red-500" />
+                        <span className="text-[10px] font-mono tracking-[0.15em] text-white/40">
+                          CSS
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => navigator.clipboard.writeText(codeCss)}
+                        className="text-[10px] font-mono text-white/30 hover:text-white transition-colors"
+                      >
+                        COPY
+                      </button>
+                    </div>
+                    <pre className="p-4 overflow-x-auto max-h-[300px] overflow-y-auto">
+                      <code className="text-xs font-mono text-white/50 leading-relaxed whitespace-pre-wrap">
+                        {codeCss}
+                      </code>
+                    </pre>
+                  </div>
+                )}
+
+                {/* JavaScript */}
+                {codeJs && (
+                  <div className="border border-white/10 bg-black">
+                    <div className="px-4 py-2 border-b border-white/5 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Code size={12} className="text-red-500" />
+                        <span className="text-[10px] font-mono tracking-[0.15em] text-white/40">
+                          JAVASCRIPT
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => navigator.clipboard.writeText(codeJs)}
+                        className="text-[10px] font-mono text-white/30 hover:text-white transition-colors"
+                      >
+                        COPY
+                      </button>
+                    </div>
+                    <pre className="p-4 overflow-x-auto max-h-[300px] overflow-y-auto">
+                      <code className="text-xs font-mono text-white/50 leading-relaxed whitespace-pre-wrap">
+                        {codeJs}
+                      </code>
+                    </pre>
+                  </div>
+                )}
+
+                {/* No code fallback */}
+                {!codeHtml && !codeCss && !codeJs && (
+                  <div className="border border-white/10 bg-black p-8 text-center">
+                    <Code size={24} className="text-white/10 mx-auto mb-3" />
+                    <p className="text-xs font-mono text-white/20">NO CODE AVAILABLE</p>
+                  </div>
+                )}
               </div>
             )}
 

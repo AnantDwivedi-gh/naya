@@ -16,6 +16,143 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api-client";
 import type { Feature } from "@/lib/data/types";
+import { UserMenu } from "@/components/auth/user-menu";
+
+// Static fallback features shown when the API is unreachable or returns empty
+const FALLBACK_FEATURES: Feature[] = [
+  {
+    id: "feat_001",
+    name: "Instagram Fact Checker",
+    description:
+      "Overlays fact-check badges on Instagram posts by cross-referencing claims with trusted databases.",
+    targetApp: "instagram.com",
+    category: "fact-checker",
+    authorId: "user_001",
+    authorName: "VerifyBot",
+    code: { html: "", css: "", js: "" },
+    triggerConditions: [],
+    integrationHooks: [],
+    permissions: ["dom-read", "network-request"],
+    tags: ["fact-check", "instagram"],
+    forkCount: 42,
+    deployCount: 1580,
+    upvotes: 312,
+    forkedFromId: null,
+    status: "published",
+    createdAt: "2025-11-15T10:30:00Z",
+    updatedAt: "2026-02-20T14:15:00Z",
+  },
+  {
+    id: "feat_002",
+    name: "Twitter Thread Summarizer",
+    description:
+      "Collapses long Twitter/X threads into concise key-point summaries using NLP.",
+    targetApp: "x.com",
+    category: "content-enhancer",
+    authorId: "user_002",
+    authorName: "ThreadWise",
+    code: { html: "", css: "", js: "" },
+    triggerConditions: [],
+    integrationHooks: [],
+    permissions: ["dom-read"],
+    tags: ["twitter", "summarizer"],
+    forkCount: 67,
+    deployCount: 2340,
+    upvotes: 489,
+    forkedFromId: null,
+    status: "published",
+    createdAt: "2025-10-20T08:00:00Z",
+    updatedAt: "2026-01-10T11:45:00Z",
+  },
+  {
+    id: "feat_003",
+    name: "YouTube Ad Skipper",
+    description:
+      "Automatically detects ad segments in YouTube videos and marks them on the progress bar.",
+    targetApp: "youtube.com",
+    category: "workflow-automator",
+    authorId: "user_003",
+    authorName: "SkipMaster",
+    code: { html: "", css: "", js: "" },
+    triggerConditions: [],
+    integrationHooks: [],
+    permissions: ["dom-read", "dom-write"],
+    tags: ["youtube", "ads", "automation"],
+    forkCount: 89,
+    deployCount: 4120,
+    upvotes: 621,
+    forkedFromId: null,
+    status: "published",
+    createdAt: "2025-09-05T14:20:00Z",
+    updatedAt: "2026-01-28T09:30:00Z",
+  },
+  {
+    id: "feat_004",
+    name: "LinkedIn Post Formatter",
+    description:
+      "Auto-formats LinkedIn posts for readability with proper line breaks and highlights.",
+    targetApp: "linkedin.com",
+    category: "content-enhancer",
+    authorId: "user_004",
+    authorName: "PostPro",
+    code: { html: "", css: "", js: "" },
+    triggerConditions: [],
+    integrationHooks: [],
+    permissions: ["dom-read", "dom-write"],
+    tags: ["linkedin", "formatting"],
+    forkCount: 23,
+    deployCount: 890,
+    upvotes: 178,
+    forkedFromId: null,
+    status: "published",
+    createdAt: "2025-12-01T16:00:00Z",
+    updatedAt: "2026-02-15T11:00:00Z",
+  },
+  {
+    id: "feat_005",
+    name: "Reddit Sentiment Analyzer",
+    description:
+      "Adds sentiment analysis badges to Reddit comments showing positive, negative, or neutral tone.",
+    targetApp: "reddit.com",
+    category: "data-extractor",
+    authorId: "user_005",
+    authorName: "SentiBot",
+    code: { html: "", css: "", js: "" },
+    triggerConditions: [],
+    integrationHooks: [],
+    permissions: ["dom-read"],
+    tags: ["reddit", "sentiment", "nlp"],
+    forkCount: 31,
+    deployCount: 1200,
+    upvotes: 245,
+    forkedFromId: null,
+    status: "published",
+    createdAt: "2025-11-20T09:00:00Z",
+    updatedAt: "2026-03-01T08:00:00Z",
+  },
+  {
+    id: "feat_006",
+    name: "Gmail Priority Inbox",
+    description:
+      "Automatically categorizes and prioritizes your Gmail inbox by urgency using AI classification.",
+    targetApp: "gmail.com",
+    category: "productivity",
+    authorId: "user_006",
+    authorName: "InboxZero",
+    code: { html: "", css: "", js: "" },
+    triggerConditions: [],
+    integrationHooks: [],
+    permissions: ["dom-read", "dom-write"],
+    tags: ["gmail", "productivity", "email"],
+    forkCount: 55,
+    deployCount: 2800,
+    upvotes: 402,
+    forkedFromId: null,
+    status: "published",
+    createdAt: "2025-10-10T12:00:00Z",
+    updatedAt: "2026-02-28T15:30:00Z",
+  },
+];
 
 const STATS = [
   { label: "FEATURES CREATED", value: "12,847", icon: Layers },
@@ -191,10 +328,17 @@ export default function Home() {
     api.features
       .list({ filter: "trending", pageSize: 6 })
       .then((res) => {
-        setTrendingFeatures(res.data);
+        if (res.data && res.data.length > 0) {
+          setTrendingFeatures(res.data);
+        } else {
+          // Empty response — use fallback
+          setTrendingFeatures(FALLBACK_FEATURES);
+        }
       })
       .catch((err) => {
         console.error("Failed to fetch trending features:", err);
+        // API error — use fallback static features
+        setTrendingFeatures(FALLBACK_FEATURES);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -222,14 +366,7 @@ export default function Home() {
               ))}
             </nav>
           </div>
-          <div className="flex items-center gap-4">
-            <a href="/profile" className="text-[11px] font-mono tracking-[0.15em] text-white/40 hover:text-white transition-colors">
-              PROFILE
-            </a>
-            <a href="/create" className="text-[11px] font-mono tracking-[0.15em] bg-red-500 text-black px-4 py-2 hover:bg-red-400 transition-colors">
-              GET STARTED
-            </a>
-          </div>
+          <UserMenu />
         </div>
       </header>
 

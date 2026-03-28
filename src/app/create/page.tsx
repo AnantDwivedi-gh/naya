@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api-client";
 import type { GeneratedFeature } from "@/lib/data/types";
+import { NavHeader } from "@/components/layout/nav-header";
 
 type GenerationPhase = "idle" | "analyzing" | "designing" | "coding" | "testing" | "complete";
 
@@ -356,40 +357,7 @@ function CreatePageInner() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      {/* Header */}
-      <header className="border-b border-white/5">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <a href="/" className="font-mono text-lg font-bold tracking-[0.3em]">
-              NAYA<span className="text-red-500">.</span>
-            </a>
-            <span className="text-white/20 font-mono text-sm">/</span>
-            <span className="text-[11px] font-mono tracking-[0.15em] text-white/40">
-              CREATE
-            </span>
-          </div>
-          {phase === "complete" && (
-            <div className="flex items-center gap-3">
-              <button
-                onClick={handlePublish}
-                disabled={publishing}
-                className="text-[10px] font-mono tracking-[0.15em] text-white/40 hover:text-white transition-colors flex items-center gap-1.5 border border-white/10 px-3 py-1.5 disabled:opacity-30"
-              >
-                {publishing ? <Loader2 size={10} className="animate-spin" /> : <Share2 size={10} />}
-                {publishing ? "PUBLISHING..." : "SHARE"}
-              </button>
-              <button
-                onClick={handleDeploy}
-                disabled={deploying}
-                className="text-[10px] font-mono tracking-[0.15em] bg-red-500 text-black px-3 py-1.5 hover:bg-red-400 transition-colors flex items-center gap-1.5 disabled:opacity-30"
-              >
-                {deploying ? <Loader2 size={10} className="animate-spin" /> : <Play size={10} />}
-                {deploying ? "DEPLOYING..." : "DEPLOY"}
-              </button>
-            </div>
-          )}
-        </div>
-      </header>
+      <NavHeader activePage="create" breadcrumbs={[{ label: "CREATE" }]} />
 
       <div className="max-w-7xl mx-auto px-6 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

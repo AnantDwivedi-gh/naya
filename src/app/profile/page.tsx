@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   User,
@@ -10,44 +12,107 @@ import {
   Download,
   Star,
   Calendar,
-  Settings,
   ExternalLink,
   Zap,
   Code,
   Users,
   Award,
 } from "lucide-react";
+import { NavHeader } from "@/components/layout/nav-header";
+import type { Feature } from "@/lib/data/types";
+
+interface DeployedFeature {
+  id: string;
+  featureId: string;
+  featureName: string;
+  targetApp: string;
+  status: "running" | "paused" | "error";
+  deployedAt: string;
+  activations: number;
+}
 
 export default function ProfilePage() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
   const [tab, setTab] = useState<"features" | "deployed" | "communities">("features");
   const [mounted, setMounted] = useState(false);
+  const [userFeatures, setUserFeatures] = useState<Feature[]>([]);
+  const [featuresLoading, setFeaturesLoading] = useState(true);
+  const [deployments, setDeployments] = useState<DeployedFeature[]>([]);
+
   useEffect(() => setMounted(true), []);
+
+  // Redirect if not logged in
+  useEffect(() => {
+    if (mounted && status === "unauthenticated") {
+      router.push("/auth/signin");
+    }
+  }, [mounted, status, router]);
+
+  // Fetch user's created features
+  useEffect(() => {
+    if (!mounted || !session?.user) return;
+    const userId = (session.user as { id?: string }).id;
+    if (!userId) {
+      setFeaturesLoading(false);
+      return;
+    }
+
+    fetch(`/api/features?authorId=${encodeURIComponent(userId)}&pageSize=50`)
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.success !== false && json.data) {
+          setUserFeatures(json.data);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to fetch user features:", err);
+      })
+      .finally(() => setFeaturesLoading(false));
+  }, [mounted, session]);
+
+  // Load deployments from localStorage
+  useEffect(() => {
+    if (!mounted) return;
+    try {
+      const stored = JSON.parse(localStorage.getItem("naya_deployments") || "[]");
+      setDeployments(stored);
+    } catch {
+      setDeployments([]);
+    }
+  }, [mounted]);
+
   if (!mounted) return null;
 
-  const user = {
-    name: "naya.builder",
-    bio: "Building the future of app experiences, one overlay at a time.",
-    reputation: 7842,
-    joined: "January 2024",
-    features: 8,
-    deployments: 23400,
-    contributions: 156,
-    communities: 4,
+  // Show loading while session is resolving
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen bg-black text-white">
+        <NavHeader activePage="profile" />
+        <div className="max-w-7xl mx-auto px-6 py-20 text-center">
+          <div className="w-8 h-8 border border-white/10 bg-white/5 animate-pulse mx-auto" />
+          <p className="text-[10px] font-mono text-white/20 mt-4 tracking-[0.15em]">LOADING PROFILE...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If unauthenticated, we already redirected above; render nothing while redirecting
+  if (!session?.user) return null;
+
+  const user = session.user as {
+    id?: string;
+    name?: string | null;
+    email?: string | null;
+    image?: string | null;
+    username?: string;
   };
 
-  const userFeatures = [
-    { name: "INSTAGRAM FACT CHECKER", votes: 2847, forks: 183, status: "deployed" },
-    { name: "TWITTER SENTIMENT LENS", votes: 1203, forks: 67, status: "deployed" },
-    { name: "YOUTUBE CHAPTER GENERATOR", votes: 892, forks: 45, status: "active" },
-    { name: "LINKEDIN CRINGE FILTER", votes: 2156, forks: 134, status: "deployed" },
-    { name: "REDDIT AMA EXTRACTOR", votes: 567, forks: 23, status: "active" },
-    { name: "GMAIL UNSUBSCRIBE ALL", votes: 3401, forks: 201, status: "deployed" },
-    { name: "DISCORD THREAD DIGEST", votes: 445, forks: 12, status: "draft" },
-    { name: "SPOTIFY LYRICS ANALYZER", votes: 789, forks: 56, status: "active" },
-  ];
+  const displayName = user.username ?? user.name ?? user.email?.split("@")[0] ?? "user";
+  const joinDate = "Member"; // Session doesn't carry join date; static fallback
 
   const achievements = [
-    { name: "FIRST DEPLOY", desc: "Deployed your first feature", earned: true },
+    { name: "FIRST DEPLOY", desc: "Deployed your first feature", earned: deployments.length > 0 },
     { name: "COMMUNITY STARTER", desc: "Created a community", earned: true },
     { name: "FORK MASTER", desc: "Feature forked 100+ times", earned: true },
     { name: "TRENDING", desc: "Feature hit trending page", earned: true },
@@ -55,48 +120,44 @@ export default function ProfilePage() {
     { name: "POLL WINNER", desc: "Feature won a community poll", earned: false },
   ];
 
+  const totalDeployActivations = deployments.reduce((sum, d) => sum + (d.activations || 0), 0);
+
   return (
     <div className="min-h-screen bg-black text-white">
-      <header className="border-b border-white/5">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <a href="/" className="font-mono text-lg font-bold tracking-[0.3em]">
-              NAYA<span className="text-red-500">.</span>
-            </a>
-            <span className="text-white/20 font-mono text-sm">/</span>
-            <span className="text-[11px] font-mono tracking-[0.15em] text-white/40">PROFILE</span>
-          </div>
-          <button className="text-[11px] font-mono tracking-[0.15em] border border-white/10 text-white/50 px-3 py-1.5 hover:text-white hover:border-white/20 transition-colors flex items-center gap-1.5">
-            <Settings size={11} /> SETTINGS
-          </button>
-        </div>
-      </header>
+      <NavHeader activePage="profile" breadcrumbs={[{ label: "PROFILE" }]} />
 
       <div className="max-w-7xl mx-auto px-6 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           {/* Sidebar */}
           <div className="space-y-4">
             <div className="border border-white/5 p-6 space-y-4">
-              <div className="w-20 h-20 bg-white/5 border border-white/10 flex items-center justify-center mx-auto">
-                <User size={32} className="text-white/20" />
+              <div className="w-20 h-20 bg-white/5 border border-white/10 flex items-center justify-center mx-auto overflow-hidden">
+                {user.image ? (
+                  <img src={user.image} alt={displayName} className="w-full h-full object-cover" />
+                ) : (
+                  <User size={32} className="text-white/20" />
+                )}
               </div>
               <div className="text-center">
-                <h2 className="text-sm font-mono font-bold">@{user.name}</h2>
-                <p className="text-[10px] font-mono text-white/30 mt-1">{user.bio}</p>
+                <h2 className="text-sm font-mono font-bold">@{displayName}</h2>
+                {user.name && user.name !== displayName && (
+                  <p className="text-[10px] font-mono text-white/40 mt-0.5">{user.name}</p>
+                )}
+                {user.email && (
+                  <p className="text-[10px] font-mono text-white/25 mt-0.5">{user.email}</p>
+                )}
               </div>
               <div className="flex items-center justify-center gap-1 text-[10px] font-mono text-white/20">
-                <Calendar size={10} /> Joined {user.joined}
+                <Calendar size={10} /> {joinDate}
               </div>
             </div>
 
             {/* Stats */}
             <div className="border border-white/5 p-5 space-y-3">
               {[
-                { label: "REPUTATION", value: user.reputation.toLocaleString(), icon: Award, color: "text-red-500" },
-                { label: "FEATURES", value: user.features.toString(), icon: Layers, color: "text-white/50" },
-                { label: "DEPLOYMENTS", value: user.deployments.toLocaleString(), icon: Download, color: "text-white/50" },
-                { label: "CONTRIBUTIONS", value: user.contributions.toString(), icon: GitFork, color: "text-white/50" },
-                { label: "COMMUNITIES", value: user.communities.toString(), icon: Users, color: "text-white/50" },
+                { label: "FEATURES", value: userFeatures.length.toString(), icon: Layers, color: "text-white/50" },
+                { label: "DEPLOYMENTS", value: deployments.length.toString(), icon: Download, color: "text-white/50" },
+                { label: "ACTIVATIONS", value: totalDeployActivations.toLocaleString(), icon: Zap, color: "text-red-500" },
               ].map((stat) => (
                 <div key={stat.label} className="flex items-center justify-between py-1.5 border-b border-white/[0.03] last:border-0">
                   <span className="text-[9px] font-mono tracking-[0.1em] text-white/20 flex items-center gap-1.5">
@@ -146,66 +207,148 @@ export default function ProfilePage() {
                     tab === t ? "bg-white/5 text-white" : "text-white/30 hover:text-white/50"
                   }`}
                 >
-                  {t.toUpperCase()} {t === "features" && `(${userFeatures.length})`}
+                  {t.toUpperCase()}{" "}
+                  {t === "features" && `(${userFeatures.length})`}
+                  {t === "deployed" && `(${deployments.length})`}
                 </button>
               ))}
             </div>
 
             {/* Features Grid */}
             {tab === "features" && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-[1px] bg-white/[0.02]">
-                {userFeatures.map((feature, i) => {
-                  const statusColor = {
-                    deployed: "text-green-500",
-                    active: "text-red-500",
-                    draft: "text-white/20",
-                  }[feature.status];
+              <>
+                {featuresLoading ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-[1px] bg-white/[0.02]">
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <div key={i} className="bg-black border border-white/[0.03] p-4 space-y-3">
+                        <div className="h-3 w-3/4 bg-white/5 animate-pulse" />
+                        <div className="h-2 w-1/2 bg-white/[0.03] animate-pulse" />
+                      </div>
+                    ))}
+                  </div>
+                ) : userFeatures.length === 0 ? (
+                  <div className="border border-white/5 p-8 text-center">
+                    <Layers size={24} className="text-white/10 mx-auto mb-3" />
+                    <p className="text-xs font-mono text-white/20">
+                      NO FEATURES CREATED YET
+                    </p>
+                    <a href="/create" className="text-[11px] font-mono text-red-500 hover:text-red-400 mt-2 inline-block">
+                      CREATE YOUR FIRST FEATURE →
+                    </a>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-[1px] bg-white/[0.02]">
+                    {userFeatures.map((feature, i) => {
+                      const statusColor = {
+                        published: "text-green-500",
+                        draft: "text-white/20",
+                        archived: "text-white/20",
+                      }[feature.status] || "text-white/20";
 
-                  return (
-                    <motion.div
-                      key={feature.name}
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.05 }}
-                      className="bg-black border border-white/[0.03] p-4 space-y-3 hover:border-white/10 transition-colors cursor-pointer"
-                    >
-                      <div className="flex items-center justify-between">
-                        <h4 className="text-[11px] font-mono font-bold tracking-wide">{feature.name}</h4>
-                        <span className={`text-[8px] font-mono tracking-[0.1em] ${statusColor}`}>
-                          ● {feature.status.toUpperCase()}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <span className="text-[10px] font-mono text-white/30 flex items-center gap-1">
-                          <TrendingUp size={9} /> {feature.votes.toLocaleString()}
-                        </span>
-                        <span className="text-[10px] font-mono text-white/30 flex items-center gap-1">
-                          <GitFork size={9} /> {feature.forks}
-                        </span>
-                      </div>
-                    </motion.div>
-                  );
-                })}
-              </div>
+                      return (
+                        <motion.a
+                          key={feature.id}
+                          href={`/feature/${feature.id}`}
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: i * 0.05 }}
+                          className="bg-black border border-white/[0.03] p-4 space-y-3 hover:border-white/10 transition-colors cursor-pointer block"
+                        >
+                          <div className="flex items-center justify-between">
+                            <h4 className="text-[11px] font-mono font-bold tracking-wide">{feature.name.toUpperCase()}</h4>
+                            <span className={`text-[8px] font-mono tracking-[0.1em] ${statusColor}`}>
+                              ● {feature.status.toUpperCase()}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <span className="text-[10px] font-mono text-white/30 flex items-center gap-1">
+                              <TrendingUp size={9} /> {feature.upvotes.toLocaleString()}
+                            </span>
+                            <span className="text-[10px] font-mono text-white/30 flex items-center gap-1">
+                              <GitFork size={9} /> {feature.forkCount}
+                            </span>
+                            <span className="text-[10px] font-mono text-white/30 flex items-center gap-1">
+                              <Download size={9} /> {feature.deployCount.toLocaleString()}
+                            </span>
+                          </div>
+                        </motion.a>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
             )}
 
             {tab === "deployed" && (
-              <div className="border border-white/5 p-8 text-center">
-                <Zap size={24} className="text-white/10 mx-auto mb-3" />
-                <p className="text-xs font-mono text-white/20">
-                  4 features currently deployed on your device
-                </p>
-                <a href="/deploy" className="text-[11px] font-mono text-red-500 hover:text-red-400 mt-2 inline-block">
-                  MANAGE DEPLOYMENTS →
-                </a>
-              </div>
+              <>
+                {deployments.length === 0 ? (
+                  <div className="border border-white/5 p-8 text-center">
+                    <Zap size={24} className="text-white/10 mx-auto mb-3" />
+                    <p className="text-xs font-mono text-white/20">
+                      NO FEATURES DEPLOYED YET
+                    </p>
+                    <a href="/explore" className="text-[11px] font-mono text-red-500 hover:text-red-400 mt-2 inline-block">
+                      BROWSE FEATURES TO DEPLOY →
+                    </a>
+                  </div>
+                ) : (
+                  <div className="space-y-[1px] bg-white/[0.02]">
+                    {deployments.map((dep, i) => (
+                      <motion.div
+                        key={dep.id}
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.05 }}
+                        className="bg-black border border-white/[0.03] p-4 flex items-center justify-between hover:border-white/10 transition-colors"
+                      >
+                        <div>
+                          <a
+                            href={`/feature/${dep.featureId}`}
+                            className="text-[11px] font-mono font-bold tracking-wide hover:text-red-500 transition-colors"
+                          >
+                            {dep.featureName.toUpperCase()}
+                          </a>
+                          <div className="flex items-center gap-3 mt-1">
+                            <span className="text-[9px] font-mono text-white/20">{dep.targetApp.toUpperCase()}</span>
+                            <span className="text-[9px] font-mono text-white/15">{dep.activations || 0} activations</span>
+                            <span className="text-[9px] font-mono text-white/15">
+                              {new Date(dep.deployedAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+                        <span
+                          className={`text-[8px] font-mono tracking-[0.1em] flex items-center gap-1 ${
+                            dep.status === "running"
+                              ? "text-green-500"
+                              : dep.status === "paused"
+                              ? "text-yellow-500"
+                              : "text-red-500"
+                          }`}
+                        >
+                          <span
+                            className={`w-1.5 h-1.5 inline-block ${
+                              dep.status === "running" ? "bg-green-500 animate-pulse" : dep.status === "paused" ? "bg-yellow-500" : "bg-red-500"
+                            }`}
+                          />
+                          {dep.status.toUpperCase()}
+                        </span>
+                      </motion.div>
+                    ))}
+                    <div className="bg-black border border-white/[0.03] p-3 text-center">
+                      <a href="/deploy" className="text-[11px] font-mono text-red-500 hover:text-red-400">
+                        MANAGE DEPLOYMENTS →
+                      </a>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
             {tab === "communities" && (
               <div className="border border-white/5 p-8 text-center">
                 <Users size={24} className="text-white/10 mx-auto mb-3" />
                 <p className="text-xs font-mono text-white/20">
-                  Member of 4 communities
+                  COMMUNITY MEMBERSHIPS
                 </p>
                 <a href="/community" className="text-[11px] font-mono text-red-500 hover:text-red-400 mt-2 inline-block">
                   VIEW COMMUNITIES →

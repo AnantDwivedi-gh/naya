@@ -24,17 +24,31 @@ export async function POST(request: NextRequest) {
     const contentLength = parseInt(request.headers.get("content-length") || "0", 10);
     if (contentLength > MAX_BODY_SIZE) {
       return NextResponse.json(
-        { success: false, error: { code: "PAYLOAD_TOO_LARGE", message: "Request body exceeds size limit" } },
+        { success: false, data: null, meta: null, error: { code: "PAYLOAD_TOO_LARGE", message: "Request body exceeds size limit" } },
         { status: 413 }
       );
     }
 
-    const body = await request.json();
+    let body: Record<string, unknown>;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        {
+          success: false,
+          data: null,
+          meta: null,
+          error: { code: "INVALID_JSON", message: "Request body must be valid JSON" },
+        },
+        { status: 400 }
+      );
+    }
 
     // --- Input validation ---------------------------------------------------
     const errors: string[] = [];
-    if (!body.description || typeof body.description !== "string") {
-      errors.push("description is required and must be a string");
+
+    if (!body.description || typeof body.description !== "string" || !(body.description as string).trim()) {
+      errors.push("description is required and must be a non-empty string");
     }
     if (!body.targetApp || typeof body.targetApp !== "string") {
       errors.push("targetApp is required and must be a string");
@@ -48,7 +62,7 @@ export async function POST(request: NextRequest) {
       "data-extractor", "ui-modifier", "accessibility",
       "productivity", "entertainment",
     ];
-    if (body.category && !validCategories.includes(body.category)) {
+    if (body.category && !validCategories.includes(body.category as FeatureCategory)) {
       errors.push(`category must be one of: ${validCategories.join(", ")}`);
     }
 
@@ -56,16 +70,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: { code: "VALIDATION_ERROR", message: "Invalid request", details: errors },
+          data: null,
+          meta: null,
+          error: { code: "VALIDATION_ERROR", message: errors.join("; "), details: errors },
         },
         { status: 400 }
       );
     }
 
     // --- Sanitise inputs (prompt-injection aware) ----------------------------
-    const descriptionResult = sanitizePrompt(body.description, 5000);
-    const desiredBehaviorResult = sanitizePrompt(body.desiredBehavior, 5000);
-    const targetApp = sanitizeInput(body.targetApp, 200);
+    const descriptionResult = sanitizePrompt(body.description as string, 5000);
+    const desiredBehaviorResult = sanitizePrompt(body.desiredBehavior as string, 5000);
+    const targetApp = sanitizeInput(body.targetApp as string, 200);
 
     // Log if prompt injection was detected (do not block — just flag)
     if (descriptionResult.injectionDetected || desiredBehaviorResult.injectionDetected) {
@@ -83,7 +99,7 @@ export async function POST(request: NextRequest) {
       description: descriptionResult.text,
       targetApp,
       desiredBehavior: desiredBehaviorResult.text,
-      category: body.category || undefined,
+      category: (body.category as FeatureCategory) || undefined,
     };
 
     // --- Generate -----------------------------------------------------------
@@ -122,9 +138,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: false,
+        data: null,
+        meta: null,
         error: {
           code: "GENERATION_ERROR",
-          message: "Feature generation failed",
+          message: error instanceof Error ? error.message : "Feature generation failed",
         },
       },
       { status: 500 }

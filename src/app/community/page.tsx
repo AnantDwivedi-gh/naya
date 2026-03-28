@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api-client";
 import type { Community, Poll } from "@/lib/data/types";
+import { NavHeader } from "@/components/layout/nav-header";
 
 function CommunityCardSkeleton({ index }: { index: number }) {
   return (
@@ -336,23 +337,7 @@ export default function CommunityPage() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      {/* Header */}
-      <header className="border-b border-white/5">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <a href="/" className="font-mono text-lg font-bold tracking-[0.3em]">
-              NAYA<span className="text-red-500">.</span>
-            </a>
-            <span className="text-white/20 font-mono text-sm">/</span>
-            <span className="text-[11px] font-mono tracking-[0.15em] text-white/40">
-              COMMUNITY
-            </span>
-          </div>
-          <button className="text-[11px] font-mono tracking-[0.15em] bg-red-500 text-black px-4 py-2 hover:bg-red-400 transition-colors flex items-center gap-1.5">
-            <Plus size={11} /> CREATE COMMUNITY
-          </button>
-        </div>
-      </header>
+      <NavHeader activePage="community" breadcrumbs={[{ label: "COMMUNITY" }]} />
 
       <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Hero Stats */}
