@@ -4,7 +4,9 @@ import {
   validatePassword,
   validateUsername,
   validateEmail,
+  getAllUsers,
 } from "@/lib/auth-users";
+import { encryptUsers } from "@/lib/user-persist";
 
 const MAX_BODY_SIZE = 2048;
 
@@ -28,7 +30,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate each field
     const unCheck = validateUsername(username.trim().toLowerCase());
     if (!unCheck.valid) {
       return NextResponse.json(
@@ -66,7 +67,20 @@ export async function POST(request: NextRequest) {
       name: name?.trim() || undefined,
     });
 
-    return NextResponse.json({
+    // Persist all users to an encrypted cookie so they survive cold starts
+    const allUsers = getAllUsers();
+    const encrypted = encryptUsers(
+      allUsers.map((u) => ({
+        id: u.id,
+        username: u.username,
+        email: u.email,
+        name: u.name,
+        passwordHash: u.passwordHash,
+        image: u.image,
+      }))
+    );
+
+    const response = NextResponse.json({
       success: true,
       data: {
         id: user.id,
@@ -75,6 +89,17 @@ export async function POST(request: NextRequest) {
         name: user.name,
       },
     });
+
+    // Set encrypted user store cookie (httpOnly, secure, 30 days)
+    response.cookies.set("naya_users", encrypted, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 30 * 24 * 60 * 60,
+      path: "/",
+    });
+
+    return response;
   } catch (err) {
     const message = err instanceof Error ? err.message : "Registration failed";
     return NextResponse.json(

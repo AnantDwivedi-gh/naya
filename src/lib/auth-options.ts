@@ -5,9 +5,11 @@ import {
   findUserByEmail,
   checkPassword,
   findOrCreateGitHubUser,
+  restoreUsers,
 } from "@/lib/auth-users";
+import { decryptUsers } from "@/lib/user-persist";
 
-// Build the providers array dynamically — only include GitHub if configured
+// Build providers array dynamically
 const providers: NextAuthOptions["providers"] = [];
 
 const githubId = process.env.GITHUB_ID ?? "";
@@ -29,9 +31,24 @@ providers.push(
       email: { label: "Email", type: "email" },
       password: { label: "Password", type: "password" },
     },
-    async authorize(credentials) {
+    async authorize(credentials, req) {
       if (!credentials?.email || !credentials?.password) {
         throw new Error("Email and password are required");
+      }
+
+      // Restore users from encrypted cookie on cold start
+      const cookieHeader = req?.headers?.cookie ?? "";
+      const match = cookieHeader.match(/naya_users=([^;]+)/);
+      if (match?.[1]) {
+        try {
+          const decoded = decodeURIComponent(match[1]);
+          const restored = decryptUsers(decoded);
+          if (restored.length > 0) {
+            restoreUsers(restored);
+          }
+        } catch {
+          // Cookie corrupted — ignore, fall through to normal lookup
+        }
       }
 
       const email = credentials.email.trim().toLowerCase();
@@ -66,7 +83,7 @@ export const authOptions: NextAuthOptions = {
 
   session: {
     strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, // 30 days
+    maxAge: 30 * 24 * 60 * 60,
   },
 
   pages: {
@@ -76,7 +93,6 @@ export const authOptions: NextAuthOptions = {
 
   callbacks: {
     async signIn({ user, account, profile }) {
-      // GitHub: find or create user in our store
       if (account?.provider === "github" && profile) {
         const ghProfile = profile as {
           id: number;
@@ -92,7 +108,6 @@ export const authOptions: NextAuthOptions = {
           email: ghProfile.email,
           avatar_url: ghProfile.avatar_url,
         });
-        // Attach stored user data
         (user as any).username = stored.username;
         (user as any).id = stored.id;
       }
@@ -111,12 +126,10 @@ export const authOptions: NextAuthOptions = {
         token.email = user.email;
         token.picture = user.image;
       }
-
       if (account?.provider === "github" && profile) {
         token.username = (profile as any).login ?? token.username;
         token.picture = (profile as any).avatar_url ?? token.picture;
       }
-
       return token;
     },
 
@@ -124,7 +137,6 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         (session.user as any).id = token.id as string;
         (session.user as any).username = token.username as string;
-        // Ensure name, email, image are always carried through
         session.user.name = token.name as string | null;
         session.user.email = token.email as string | null;
         session.user.image = token.picture as string | null;

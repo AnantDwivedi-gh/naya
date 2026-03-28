@@ -1,9 +1,7 @@
 import { hashSync, compareSync } from "bcryptjs";
 
 // ---------------------------------------------------------------------------
-// User store — uses global Map that persists across requests in same
-// serverless instance + JWT carries user data so auth works even after
-// cold starts.
+// User store — globalThis persists across hot reloads & same serverless instance
 // ---------------------------------------------------------------------------
 
 export interface StoredUser {
@@ -16,13 +14,11 @@ export interface StoredUser {
   createdAt: string;
 }
 
-// Use global to persist across hot reloads in dev and within same
-// serverless invocation on Vercel
-const globalUsers = (globalThis as any).__nayaUsers as Map<string, StoredUser> | undefined;
-const users: Map<string, StoredUser> = globalUsers ?? new Map<string, StoredUser>();
+const globalStore = (globalThis as any).__nayaUsers as Map<string, StoredUser> | undefined;
+const users: Map<string, StoredUser> = globalStore ?? new Map<string, StoredUser>();
 (globalThis as any).__nayaUsers = users;
 
-// Seed demo account (always available)
+// Seed demo account
 if (!users.has("demo@naya.app")) {
   users.set("demo@naya.app", {
     id: "demo-001",
@@ -33,6 +29,36 @@ if (!users.has("demo@naya.app")) {
     passwordHash: hashSync("Naya@2024!", 10),
     createdAt: new Date().toISOString(),
   });
+}
+
+// ---------------------------------------------------------------------------
+// Restore users from encrypted cookie data (called on cold start)
+// ---------------------------------------------------------------------------
+
+let _restored = (globalThis as any).__nayaUsersRestored ?? false;
+
+export function restoreUsers(
+  decrypted: Array<{
+    id: string;
+    username: string;
+    email: string;
+    name: string;
+    passwordHash: string;
+    image: string | null;
+  }>
+): void {
+  if (_restored) return; // only restore once per instance
+  for (const u of decrypted) {
+    if (!users.has(u.email.toLowerCase())) {
+      users.set(u.email.toLowerCase(), {
+        ...u,
+        email: u.email.toLowerCase(),
+        createdAt: new Date().toISOString(),
+      });
+    }
+  }
+  _restored = true;
+  (globalThis as any).__nayaUsersRestored = true;
 }
 
 // ---------------------------------------------------------------------------
@@ -60,23 +86,16 @@ export function validatePassword(password: string): PasswordCheck {
     hasNumber: /[0-9]/.test(password),
     hasSpecial: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password),
   };
-
   const score = Object.values(checks).filter(Boolean).length;
   const valid = checks.minLength && score >= 4;
-
   let message = "";
   if (!checks.minLength) message = "At least 8 characters required";
   else if (score < 3) message = "Too weak — add uppercase, numbers, or symbols";
   else if (score < 4) message = "Almost — add one more character type";
   else if (score === 4) message = "Strong password";
   else message = "Very strong password";
-
   return { valid, score, checks, message };
 }
-
-// ---------------------------------------------------------------------------
-// Username validation
-// ---------------------------------------------------------------------------
 
 export function validateUsername(username: string): { valid: boolean; message: string } {
   if (username.length < 3) return { valid: false, message: "At least 3 characters" };
@@ -84,16 +103,10 @@ export function validateUsername(username: string): { valid: boolean; message: s
   if (!/^[a-z0-9._]+$/.test(username)) return { valid: false, message: "Only lowercase, numbers, dots, underscores" };
   if (/^[._]/.test(username) || /[._]$/.test(username)) return { valid: false, message: "Cannot start or end with . or _" };
   if (/[._]{2}/.test(username)) return { valid: false, message: "No consecutive dots or underscores" };
-
   const reserved = ["admin", "naya", "system", "root", "api", "auth"];
   if (reserved.includes(username)) return { valid: false, message: "Username is reserved" };
-
   return { valid: true, message: "Available" };
 }
-
-// ---------------------------------------------------------------------------
-// Email validation
-// ---------------------------------------------------------------------------
 
 export function validateEmail(email: string): { valid: boolean; message: string } {
   const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -122,6 +135,10 @@ export function checkPassword(user: StoredUser, password: string): boolean {
   return compareSync(password, user.passwordHash);
 }
 
+export function getAllUsers(): StoredUser[] {
+  return Array.from(users.values());
+}
+
 export function createUser(data: {
   username: string;
   email: string;
@@ -131,16 +148,12 @@ export function createUser(data: {
 }): StoredUser {
   const existing = findUserByEmail(data.email);
   if (existing) throw new Error("An account with this email already exists");
-
   const existingUsername = findUserByUsername(data.username);
   if (existingUsername) throw new Error("Username is taken");
-
   const pwCheck = validatePassword(data.password);
   if (!pwCheck.valid) throw new Error(pwCheck.message);
-
   const unCheck = validateUsername(data.username);
   if (!unCheck.valid) throw new Error(unCheck.message);
-
   const emCheck = validateEmail(data.email);
   if (!emCheck.valid) throw new Error(emCheck.message);
 
@@ -156,7 +169,6 @@ export function createUser(data: {
     passwordHash: hashSync(data.password, 10),
     createdAt: new Date().toISOString(),
   };
-
   users.set(user.email, user);
   return user;
 }
@@ -172,10 +184,8 @@ export function findOrCreateGitHubUser(profile: {
     const existing = findUserByEmail(profile.email);
     if (existing) return existing;
   }
-
   userCounter++;
   (globalThis as any).__nayaUserCounter = userCounter;
-
   const user: StoredUser = {
     id: `gh-${profile.id}`,
     username: profile.login.toLowerCase(),
@@ -185,7 +195,6 @@ export function findOrCreateGitHubUser(profile: {
     passwordHash: "",
     createdAt: new Date().toISOString(),
   };
-
   users.set(user.email, user);
   return user;
 }
