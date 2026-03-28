@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { signIn } from "next-auth/react";
+import { signIn, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -49,7 +49,7 @@ function PasswordStrength({
 }: {
   password: string;
 }) {
-  const { checks, score, valid } = validatePasswordLocal(password);
+  const { checks, score } = validatePasswordLocal(password);
 
   if (!password) return null;
 
@@ -138,14 +138,37 @@ function PasswordStrength({
 
 export default function SignUpPage() {
   const router = useRouter();
+  const { status } = useSession();
+
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [githubLoading, setGithubLoading] = useState(false);
+  const [githubEnabled, setGithubEnabled] = useState(false);
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [usernameStatus, setUsernameStatus] = useState<"idle" | "checking" | "available" | "taken">("idle");
+
+  // Redirect if already signed in
+  useEffect(() => {
+    if (status === "authenticated") {
+      router.replace("/");
+    }
+  }, [status, router]);
+
+  // Check if GitHub OAuth is available
+  useEffect(() => {
+    fetch("/api/auth/providers")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.github) setGithubEnabled(true);
+      })
+      .catch(() => {
+        // Silently fail — GitHub button stays hidden
+      });
+  }, []);
 
   // Live username validation
   useEffect(() => {
@@ -162,8 +185,6 @@ export default function SignUpPage() {
 
     setUsernameStatus("checking");
     const timeout = setTimeout(() => {
-      // In real app: call API to check availability
-      // For now: simulate
       const reserved = ["admin", "naya", "system", "root", "api", "auth"];
       if (reserved.includes(username)) {
         setUsernameStatus("taken");
@@ -179,6 +200,7 @@ export default function SignUpPage() {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     setLoading(true);
     setError("");
     setFieldErrors({});
@@ -214,6 +236,7 @@ export default function SignUpPage() {
       });
 
       if (signInRes?.error) {
+        // Account was created but auto-sign-in failed — send to sign-in page
         setError("Account created but sign-in failed. Please sign in manually.");
         setLoading(false);
         return;
@@ -222,7 +245,7 @@ export default function SignUpPage() {
       router.push("/onboarding");
       router.refresh();
     } catch {
-      setError("Something went wrong. Please try again.");
+      setError("Network error. Please check your connection and try again.");
       setLoading(false);
     }
   };
@@ -231,7 +254,13 @@ export default function SignUpPage() {
     username.length >= 3 &&
     email.includes("@") &&
     passwordValid &&
-    !loading;
+    !loading &&
+    !githubLoading;
+
+  // Don't render form while checking session (avoids flash)
+  if (status === "loading") {
+    return <div className="min-h-screen bg-black" />;
+  }
 
   return (
     <div className="min-h-screen bg-black text-white flex items-center justify-center px-4">
@@ -297,22 +326,34 @@ export default function SignUpPage() {
               )}
             </AnimatePresence>
 
-            {/* GitHub OAuth */}
-            <button
-              onClick={() => signIn("github", { callbackUrl: "/onboarding" })}
-              className="w-full flex items-center justify-center gap-3 border border-white/20 bg-transparent px-4 py-3 font-mono text-xs tracking-[0.1em] text-white/80 hover:border-white hover:text-white transition-colors duration-150"
-            >
-              <Github size={16} />
-              SIGN UP WITH GITHUB
-            </button>
+            {/* GitHub OAuth — only shown when configured */}
+            {githubEnabled && (
+              <>
+                <button
+                  onClick={() => {
+                    setGithubLoading(true);
+                    signIn("github", { callbackUrl: "/onboarding" });
+                  }}
+                  disabled={githubLoading || loading}
+                  className="w-full flex items-center justify-center gap-3 border border-white/20 bg-transparent px-4 py-3 font-mono text-xs tracking-[0.1em] text-white/80 hover:border-white hover:text-white transition-colors duration-150 disabled:opacity-40"
+                >
+                  {githubLoading ? (
+                    <span className="inline-block w-3 h-3 border border-white/40 border-t-white animate-spin" />
+                  ) : (
+                    <Github size={16} />
+                  )}
+                  SIGN UP WITH GITHUB
+                </button>
 
-            <div className="flex items-center gap-4">
-              <div className="flex-1 h-px bg-white/10" />
-              <span className="text-[10px] font-mono text-white/20 tracking-[0.2em]">
-                OR
-              </span>
-              <div className="flex-1 h-px bg-white/10" />
-            </div>
+                <div className="flex items-center gap-4">
+                  <div className="flex-1 h-px bg-white/10" />
+                  <span className="text-[10px] font-mono text-white/20 tracking-[0.2em]">
+                    OR
+                  </span>
+                  <div className="flex-1 h-px bg-white/10" />
+                </div>
+              </>
+            )}
 
             {/* Form */}
             <form onSubmit={handleSignUp} className="space-y-4">
@@ -331,10 +372,11 @@ export default function SignUpPage() {
                       setFieldErrors((prev) => ({ ...prev, username: "" }));
                     }}
                     required
+                    disabled={loading}
                     minLength={3}
                     maxLength={20}
                     placeholder="your.handle"
-                    className="flex-1 bg-transparent font-mono text-xs text-white outline-none placeholder:text-white/15"
+                    className="flex-1 bg-transparent font-mono text-xs text-white outline-none placeholder:text-white/15 disabled:opacity-50"
                     autoComplete="username"
                   />
                   {usernameStatus === "checking" && (
@@ -376,8 +418,9 @@ export default function SignUpPage() {
                       setFieldErrors((prev) => ({ ...prev, email: "" }));
                     }}
                     required
+                    disabled={loading}
                     placeholder="you@example.com"
-                    className="flex-1 bg-transparent font-mono text-xs text-white outline-none placeholder:text-white/15"
+                    className="flex-1 bg-transparent font-mono text-xs text-white outline-none placeholder:text-white/15 disabled:opacity-50"
                     autoComplete="email"
                   />
                 </div>
@@ -401,8 +444,9 @@ export default function SignUpPage() {
                       setFieldErrors((prev) => ({ ...prev, password: "" }));
                     }}
                     required
+                    disabled={loading}
                     placeholder="Create a strong password"
-                    className="flex-1 bg-transparent font-mono text-xs text-white outline-none placeholder:text-white/15"
+                    className="flex-1 bg-transparent font-mono text-xs text-white outline-none placeholder:text-white/15 disabled:opacity-50"
                     autoComplete="new-password"
                   />
                   <button

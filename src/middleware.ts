@@ -3,33 +3,20 @@ import { getToken } from "next-auth/jwt";
 import { generateCspHeaderValue } from "@/lib/security/csp";
 
 // ---------------------------------------------------------------------------
-// Auth — protected / public route definitions
+// Auth — protected / public / auth-only route definitions
 // ---------------------------------------------------------------------------
 
-const PUBLIC_PATHS = [
-  "/",
-  "/explore",
-  "/auth",
-  "/api/auth",
-];
-
-/** Paths that start with these prefixes are always public. */
-function isPublicRoute(pathname: string): boolean {
-  if (PUBLIC_PATHS.includes(pathname)) return true;
-  if (pathname.startsWith("/auth/")) return true;
-  if (pathname.startsWith("/api/auth/")) return true;
-  if (pathname.startsWith("/feature/")) return true;
-  if (pathname.startsWith("/explore")) return true;
-  // Static assets / _next internals are never matched by the middleware config
-  return false;
-}
-
-/** Routes that require authentication. */
+/** Routes that require authentication — redirect to /auth/signin if not. */
 function isProtectedRoute(pathname: string): boolean {
-  const protectedPrefixes = ["/create", "/deploy", "/profile", "/community"];
+  const protectedPrefixes = ["/create", "/deploy", "/profile"];
   return protectedPrefixes.some(
     (p) => pathname === p || pathname.startsWith(p + "/")
   );
+}
+
+/** Auth pages that should redirect to / if user IS logged in. */
+function isAuthPage(pathname: string): boolean {
+  return pathname === "/auth/signin" || pathname === "/auth/signup";
 }
 
 // ---------------------------------------------------------------------------
@@ -58,18 +45,15 @@ function getRateLimitInfo(ip: string): { allowed: boolean; remaining: number; re
   const remaining = Math.max(0, RATE_LIMIT_MAX_REQUESTS - entry.count);
   const allowed = entry.count <= RATE_LIMIT_MAX_REQUESTS;
 
-  return { allowed, remaining, resetAt: entry.resetAt };
-}
-
-// Periodic cleanup to prevent memory leak
-setInterval(() => {
-  const now = Date.now();
-  for (const [ip, entry] of rateLimitStore) {
-    if (now > entry.resetAt) {
-      rateLimitStore.delete(ip);
+  // Lazy cleanup: prune expired entries when store grows large
+  if (rateLimitStore.size > 5000) {
+    for (const [key, val] of rateLimitStore) {
+      if (now > val.resetAt) rateLimitStore.delete(key);
     }
   }
-}, RATE_LIMIT_WINDOW_MS * 2);
+
+  return { allowed, remaining, resetAt: entry.resetAt };
+}
 
 // ---------------------------------------------------------------------------
 // CSP header (generated once at module load)
@@ -83,6 +67,14 @@ const cspHeaderValue = generateCspHeaderValue();
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // --- Auth pages: redirect logged-in users away ----------------------------
+  if (isAuthPage(pathname)) {
+    const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
+    if (token) {
+      return NextResponse.redirect(new URL("/", request.url));
+    }
+  }
 
   // --- Auth gate (redirect unauthenticated users on protected routes) ------
   if (isProtectedRoute(pathname)) {
@@ -181,10 +173,16 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
+    // API routes (for CORS, rate limiting, security headers)
     "/api/:path*",
+    // Protected routes
     "/create/:path*",
     "/deploy/:path*",
     "/profile/:path*",
+    // Auth pages (for redirect-if-logged-in)
+    "/auth/signin",
+    "/auth/signup",
+    // Community gets security headers but NOT auth protection
     "/community/:path*",
   ],
 };

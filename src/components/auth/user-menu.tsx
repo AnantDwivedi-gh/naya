@@ -39,7 +39,7 @@ export function UserMenu() {
           SIGN IN
         </a>
         <a
-          href="/auth/signin"
+          href="/auth/signup"
           className="text-[11px] font-mono tracking-[0.15em] bg-red-500 text-black px-4 py-2 hover:bg-red-400 transition-colors"
         >
           GET STARTED

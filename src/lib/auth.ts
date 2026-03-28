@@ -3,9 +3,7 @@ import {
   type Session,
 } from "next-auth";
 
-// Re-export authOptions from the route to avoid circular deps at build time.
-// We inline the import path so the module is only resolved on the server.
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth-options";
 
 // ---------------------------------------------------------------------------
 // Extended session types

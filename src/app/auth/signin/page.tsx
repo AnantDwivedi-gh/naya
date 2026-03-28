@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, Suspense } from "react";
-import { signIn } from "next-auth/react";
+import { useState, useEffect, Suspense } from "react";
+import { signIn, useSession } from "next-auth/react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Github, ArrowRight, AlertCircle, Eye, EyeOff } from "lucide-react";
@@ -20,11 +20,14 @@ function SignInPageInner() {
   const callbackUrl = searchParams.get("callbackUrl") ?? "/";
   const errorParam = searchParams.get("error");
 
+  const { status } = useSession();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [githubLoading, setGithubLoading] = useState(false);
+  const [githubEnabled, setGithubEnabled] = useState(false);
   const [error, setError] = useState(
     errorParam === "CredentialsSignin"
       ? "Invalid email or password"
@@ -35,35 +38,65 @@ function SignInPageInner() {
       : ""
   );
 
+  // Redirect if already signed in
+  useEffect(() => {
+    if (status === "authenticated") {
+      router.replace(callbackUrl);
+    }
+  }, [status, router, callbackUrl]);
+
+  // Check if GitHub OAuth is available
+  useEffect(() => {
+    fetch("/api/auth/providers")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.github) setGithubEnabled(true);
+      })
+      .catch(() => {
+        // Silently fail — GitHub button stays hidden
+      });
+  }, []);
+
   async function handleCredentials(e: React.FormEvent) {
     e.preventDefault();
+    if (loading) return;
     setLoading(true);
     setError("");
 
-    const res = await signIn("credentials", {
-      email: email.trim(),
-      password,
-      redirect: false,
-    });
+    try {
+      const res = await signIn("credentials", {
+        email: email.trim(),
+        password,
+        redirect: false,
+      });
 
-    setLoading(false);
+      if (res?.error) {
+        // NextAuth wraps custom errors in CredentialsSignin sometimes
+        setError(
+          res.error === "CredentialsSignin"
+            ? "Invalid email or password"
+            : res.error
+        );
+        setLoading(false);
+        return;
+      }
 
-    if (res?.error) {
-      setError(
-        res.error === "CredentialsSignin"
-          ? "Invalid email or password"
-          : res.error
-      );
-      return;
+      router.push(callbackUrl);
+      router.refresh();
+    } catch {
+      setError("Network error. Please check your connection and try again.");
+      setLoading(false);
     }
-
-    router.push(callbackUrl);
-    router.refresh();
   }
 
   function handleGitHub() {
     setGithubLoading(true);
     signIn("github", { callbackUrl });
+  }
+
+  // Don't render form while checking session (avoids flash)
+  if (status === "loading") {
+    return <div className="min-h-screen bg-black" />;
   }
 
   return (
@@ -126,28 +159,32 @@ function SignInPageInner() {
               </motion.div>
             )}
 
-            {/* GitHub OAuth */}
-            <button
-              onClick={handleGitHub}
-              disabled={githubLoading}
-              className="w-full flex items-center justify-center gap-3 border border-white/20 bg-transparent px-4 py-3 font-mono text-xs tracking-[0.1em] text-white/80 hover:border-white hover:text-white transition-colors duration-150 disabled:opacity-40"
-            >
-              {githubLoading ? (
-                <span className="inline-block w-3 h-3 border border-white/40 border-t-white animate-spin" />
-              ) : (
-                <Github size={16} />
-              )}
-              CONTINUE WITH GITHUB
-            </button>
+            {/* GitHub OAuth — only shown when configured */}
+            {githubEnabled && (
+              <>
+                <button
+                  onClick={handleGitHub}
+                  disabled={githubLoading || loading}
+                  className="w-full flex items-center justify-center gap-3 border border-white/20 bg-transparent px-4 py-3 font-mono text-xs tracking-[0.1em] text-white/80 hover:border-white hover:text-white transition-colors duration-150 disabled:opacity-40"
+                >
+                  {githubLoading ? (
+                    <span className="inline-block w-3 h-3 border border-white/40 border-t-white animate-spin" />
+                  ) : (
+                    <Github size={16} />
+                  )}
+                  CONTINUE WITH GITHUB
+                </button>
 
-            {/* Divider */}
-            <div className="flex items-center gap-4">
-              <div className="flex-1 h-px bg-white/10" />
-              <span className="text-[10px] font-mono text-white/20 tracking-[0.2em]">
-                OR
-              </span>
-              <div className="flex-1 h-px bg-white/10" />
-            </div>
+                {/* Divider */}
+                <div className="flex items-center gap-4">
+                  <div className="flex-1 h-px bg-white/10" />
+                  <span className="text-[10px] font-mono text-white/20 tracking-[0.2em]">
+                    OR
+                  </span>
+                  <div className="flex-1 h-px bg-white/10" />
+                </div>
+              </>
+            )}
 
             {/* Credentials form */}
             <form onSubmit={handleCredentials} className="space-y-4">
@@ -163,8 +200,9 @@ function SignInPageInner() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
+                    disabled={loading}
                     placeholder="you@example.com"
-                    className="flex-1 bg-transparent font-mono text-xs text-white outline-none placeholder:text-white/15"
+                    className="flex-1 bg-transparent font-mono text-xs text-white outline-none placeholder:text-white/15 disabled:opacity-50"
                     autoComplete="email"
                   />
                 </div>
@@ -182,8 +220,9 @@ function SignInPageInner() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
+                    disabled={loading}
                     placeholder="••••••••"
-                    className="flex-1 bg-transparent font-mono text-xs text-white outline-none placeholder:text-white/15"
+                    className="flex-1 bg-transparent font-mono text-xs text-white outline-none placeholder:text-white/15 disabled:opacity-50"
                     autoComplete="current-password"
                   />
                   <button
@@ -199,7 +238,7 @@ function SignInPageInner() {
               {/* Submit */}
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || githubLoading}
                 className="w-full flex items-center justify-center gap-2 bg-red-500 text-black font-mono text-xs tracking-[0.15em] font-bold px-4 py-3 hover:bg-red-400 transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {loading ? (
